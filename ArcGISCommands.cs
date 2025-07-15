@@ -94,6 +94,44 @@ namespace ArcGisAutoCAD
             panelSource.Items.Add(settingsBtn);
             panelSource.Items.Add(new RibbonSeparator());
             panelSource.Items.Add(foldersBtn);
+
+            var postgisPanelSource = new RibbonPanelSource
+            {
+                Title = "PostGIS"
+            };
+            var postgisPanel = new RibbonPanel { Source = postgisPanelSource };
+            customTab.Panels.Add(postgisPanel);
+
+            var pgSettingsBtn = new RibbonButton
+            {
+                Text = "Settings",
+                ShowText = true,
+                Size = RibbonItemSize.Large,
+                Orientation = System.Windows.Controls.Orientation.Vertical,
+                // Set your own image here if you like
+                CommandHandler = new RibbonCommandHandler("PGSETTINGS")
+            };
+            var pgImportBtn = new RibbonButton
+            {
+                Text = "Import",
+                ShowText = true,
+                Size = RibbonItemSize.Large,
+                Orientation = System.Windows.Controls.Orientation.Vertical,
+                CommandHandler = new RibbonCommandHandler("PGIMPORT")
+            };
+            var pgQueryImportBtn = new RibbonButton
+            {
+                Text = "Query Import",
+                ShowText = true,
+                Size = RibbonItemSize.Large,
+                Orientation = System.Windows.Controls.Orientation.Vertical,
+                CommandHandler = new RibbonCommandHandler("PGQUERYIMPORT")
+            };
+
+            postgisPanelSource.Items.Add(pgSettingsBtn);
+            postgisPanelSource.Items.Add(new RibbonSeparator());
+            postgisPanelSource.Items.Add(pgImportBtn);
+            postgisPanelSource.Items.Add(pgQueryImportBtn);
         }
 
         private BitmapImage LoadImageResource(string imageName)
@@ -205,6 +243,39 @@ namespace ArcGisAutoCAD
             {
                 ed.WriteMessage($"\nError: {ex.Message}");
             }
+        }
+
+        [CommandMethod("PGSETTINGS")]
+        public void PgSettingsCommand()
+        {
+            var window = new PgLoginWindow();
+            bool? result = window.ShowDialog();
+            // Optionally: Give feedback to the user via the AutoCAD editor
+            var ed = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument.Editor;
+            if (result == true)
+            {
+                ed.WriteMessage("\nPostGIS connection saved.");
+            }
+            else
+            {
+                ed.WriteMessage("\nPostGIS login canceled or failed.");
+            }
+        }
+
+        [CommandMethod("PGIMPORT")]
+        public void PgImportCommand()
+        {
+            // Leave blank or show a message for now
+            var ed = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument.Editor;
+            ed.WriteMessage("\nPostGIS Import is not yet implemented.");
+        }
+
+        [CommandMethod("PGQUERYIMPORT")]
+        public void PgQueryImportCommand()
+        {
+            // Leave blank or show a message for now
+            var ed = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument.Editor;
+            ed.WriteMessage("\nPostGIS Query Import is not yet implemented.");
         }
 
     }
