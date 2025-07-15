@@ -1,0 +1,30 @@
+<Window x:Class="ArcGisAutoCAD.FoldersWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="AGOL Folders" Height="400" Width="350" WindowStartupLocation="CenterScreen">
+    <Grid Margin="10">
+        <StackPanel>
+            <TextBlock Text="Select a folder:" Margin="0,0,0,5"/>
+            <ComboBox x:Name="FoldersDropdown" SelectionChanged="FoldersDropdown_SelectionChanged" Height="25"/>
+
+            <StackPanel>
+            <TextBlock Text="Select layers to load:" Margin="10,10,0,5"/>
+            
+            <ListBox x:Name="LayersListBox" Height="150" SelectionMode="Multiple">
+                <ListBox.ItemTemplate>
+                <DataTemplate>
+                    <CheckBox Content="{Binding Title}" IsChecked="{Binding IsSelected, Mode=TwoWay}" />
+                </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+
+            <Button x:Name="LoadButton" Content="Load Selected Layers" Click="LoadSelectedLayers_Click" Margin="0,10,0,0" Height="30" />
+
+            <ProgressBar x:Name="LoadingSpinner" IsIndeterminate="True" Visibility="Collapsed" Height="20" Margin="0,10,0,0" />
+            </StackPanel>
+
+
+            <!-- <Button Content="Load Layer" Click="LoadSelectedLayers_Click" Margin="0,10,0,0"/> -->
+        </StackPanel>
+    </Grid>
+</Window>

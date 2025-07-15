@@ -1,0 +1,27 @@
+<Window x:Class="ArcGisAutoCAD.LoginWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="AGOL Login" Height="300" Width="300" WindowStartupLocation="CenterScreen">
+    <Grid Margin="10">
+        <StackPanel>
+            <TextBlock Text="Username:" />
+            <TextBox x:Name="UsernameBox" Margin="0,5,0,10"/>
+
+            <TextBlock Text="Password:" />
+            <PasswordBox x:Name="PasswordBox" Margin="0,5,0,10"/>
+
+            <TextBlock Text="Target CRS (EPSG):" />
+            <ComboBox x:Name="CrsDropdown" SelectionChanged="CrsDropdown_SelectionChanged">
+                <ComboBoxItem Content="4326 - WGS 84 (World)" />
+                <ComboBoxItem Content="3857 - Web Mercator" />
+                <ComboBoxItem Content="27700 - British National Grid" />
+                <!-- <ComboBoxItem Content="Custom..." /> -->
+            </ComboBox>
+            <!-- <TextBox x:Name="CustomCrsBox" Margin="0,5,0,10" Visibility="Collapsed"/> -->
+
+            <Button Content="Login" Click="Login_Click" Margin="0,0,0,5"/>
+            <Button Content="Logout" Click="Logout_Click"/>
+            <TextBlock x:Name="StatusText" Margin="0,10,0,0" Foreground="Green"/>
+        </StackPanel>
+    </Grid>
+</Window>
