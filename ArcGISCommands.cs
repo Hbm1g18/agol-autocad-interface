@@ -92,7 +92,7 @@ namespace ArcGisAutoCAD
             };
 
             panelSource.Items.Add(settingsBtn);
-            panelSource.Items.Add(new RibbonSeparator());
+            // panelSource.Items.Add(new RibbonSeparator());
             panelSource.Items.Add(foldersBtn);
 
             var postgisPanelSource = new RibbonPanelSource
@@ -104,32 +104,37 @@ namespace ArcGisAutoCAD
 
             var pgSettingsBtn = new RibbonButton
             {
-                Text = "Settings",
+                Text = "PG Settings",
                 ShowText = true,
                 Size = RibbonItemSize.Large,
                 Orientation = System.Windows.Controls.Orientation.Vertical,
-                // Set your own image here if you like
+                LargeImage = LoadImageResource("settings.png"),
+                ShowImage = true,
                 CommandHandler = new RibbonCommandHandler("PGSETTINGS")
             };
             var pgImportBtn = new RibbonButton
             {
-                Text = "Import",
+                Text = "Import Table",
                 ShowText = true,
                 Size = RibbonItemSize.Large,
                 Orientation = System.Windows.Controls.Orientation.Vertical,
+                LargeImage = LoadImageResource("postgres.png"),
+                ShowImage = true,
                 CommandHandler = new RibbonCommandHandler("PGIMPORT")
             };
             var pgQueryImportBtn = new RibbonButton
             {
-                Text = "Query Import",
+                Text = "Import by Query",
                 ShowText = true,
                 Size = RibbonItemSize.Large,
                 Orientation = System.Windows.Controls.Orientation.Vertical,
+                LargeImage = LoadImageResource("queryimport.png"),
+                ShowImage = true,
                 CommandHandler = new RibbonCommandHandler("PGQUERYIMPORT")
             };
 
             postgisPanelSource.Items.Add(pgSettingsBtn);
-            postgisPanelSource.Items.Add(new RibbonSeparator());
+            // postgisPanelSource.Items.Add(new RibbonSeparator());
             postgisPanelSource.Items.Add(pgImportBtn);
             postgisPanelSource.Items.Add(pgQueryImportBtn);
         }
@@ -265,19 +270,17 @@ namespace ArcGisAutoCAD
         [CommandMethod("PGIMPORT")]
         public void PgImportCommand()
         {
-            // Leave blank or show a message for now
-            var ed = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument.Editor;
-            ed.WriteMessage("\nPostGIS Import is not yet implemented.");
+            var window = new PgImportWindow();
+            window.ShowDialog();
         }
+
 
         [CommandMethod("PGQUERYIMPORT")]
         public void PgQueryImportCommand()
         {
-            // Leave blank or show a message for now
-            var ed = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument.Editor;
-            ed.WriteMessage("\nPostGIS Query Import is not yet implemented.");
+            var window = new PgQueryImportWindow();
+            window.ShowDialog();
         }
-
     }
 
     public class ArcSettings

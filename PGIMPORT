@@ -1,0 +1,6 @@
+[CommandMethod("PGIMPORT")]
+public void PgImportCommand()
+{
+    var window = new PgImportWindow();
+    window.ShowDialog();
+}

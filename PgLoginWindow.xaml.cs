@@ -64,6 +64,8 @@ namespace ArcGisAutoCAD
         public string Password { get; set; }
         public string Database { get; set; }
         public int Port { get; set; } = 5432;
+        public int SourceEpsg { get; set; } = 4326;
+        public int TargetEpsg { get; set; } = 27700;
 
         private static string SettingsPath =>
             System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "ArcGisAutoCAD", "pgsettings.json");

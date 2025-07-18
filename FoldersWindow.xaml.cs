@@ -316,7 +316,7 @@ namespace ArcGisAutoCAD
             return (ProjectedCoordinateSystem)cFactory.CreateFromWkt(wkt);
         }
 
-        private static List<string> GetBlockNames()
+        public static List<string> GetBlockNames()
         {
             var names = new List<string>();
             var doc = AcApp.DocumentManager.MdiActiveDocument;
@@ -354,7 +354,19 @@ namespace ArcGisAutoCAD
             return tempPath;
         }
 
-        private static void ImportBlocksFromResource(Database db, string filePath)
+        public static string GetWktForEpsg(int epsgCode)
+        {
+            var mappings = new Dictionary<int, string>
+            {
+                { 4326, GeographicCoordinateSystem.WGS84.WKT },
+                { 3857, ProjectedCoordinateSystem.WebMercator.WKT },
+                { 27700, "PROJCS[\"OSGB 1936 / British National Grid\", GEOGCS[\"OSGB 1936\", DATUM[\"OSGB_1936\", SPHEROID[\"Airy 1830\",6377563.396,299.3249646,AUTHORITY[\"EPSG\",\"7001\"]], TOWGS84[375,-111,431,0,0,0,0], AUTHORITY[\"EPSG\",\"6277\"]], PRIMEM[\"Greenwich\",0, AUTHORITY[\"EPSG\",\"8901\"]], UNIT[\"degree\",0.0174532925199433, AUTHORITY[\"EPSG\",\"9122\"]], AUTHORITY[\"EPSG\",\"4277\"]], PROJECTION[\"Transverse_Mercator\"], PARAMETER[\"latitude_of_origin\",49], PARAMETER[\"central_meridian\",-2], PARAMETER[\"scale_factor\",0.9996012717], PARAMETER[\"false_easting\",400000], PARAMETER[\"false_northing\",-100000], UNIT[\"metre\",1, AUTHORITY[\"EPSG\",\"9001\"]], AUTHORITY[\"EPSG\",\"27700\"]]" }
+            };
+
+            return mappings.ContainsKey(epsgCode) ? mappings[epsgCode] : mappings[27700];
+        }
+
+        public static void ImportBlocksFromResource(Database db, string filePath)
         {
             var doc = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument;
             using (doc.LockDocument())
@@ -390,7 +402,7 @@ namespace ArcGisAutoCAD
             }
         }
 
-        private static List<string> GetBlockAttributeTags(Database db, string blockName)
+        public static List<string> GetBlockAttributeTags(Database db, string blockName)
         {
             var tags = new List<string>();
             using (var tr = db.TransactionManager.StartTransaction())

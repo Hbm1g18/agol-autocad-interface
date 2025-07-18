@@ -1,0 +1,29 @@
+<Window x:Class="ArcGisAutoCAD.PgImportWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="PostGIS Import" Height="250" Width="450" ResizeMode="NoResize" WindowStartupLocation="CenterScreen">
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        <TextBlock Text="Select table with geometry:" Grid.Row="0"/>
+        <ComboBox Name="TablesCombo" Grid.Row="1" Height="28" Margin="0,5,0,10" DisplayMemberPath="DisplayName"/>
+        <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,5,0,10">
+            <TextBlock Text="Source CRS (EPSG):" VerticalAlignment="Center"/>
+            <TextBox Name="SourceCrsBox" Width="70" Margin="10,0,20,0" VerticalAlignment="Center"/>
+            <TextBlock Text="Target CRS (EPSG):" VerticalAlignment="Center"/>
+            <TextBox Name="TargetCrsBox" Width="70" Margin="10,0,0,0" VerticalAlignment="Center"/>
+        </StackPanel>
+        <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+            <CheckBox x:Name="SplitByAttributeCheck" Content="Split by attribute" Margin="0,0,10,0"
+                    Checked="SplitByAttributeCheck_Checked" Unchecked="SplitByAttributeCheck_Unchecked"/>
+            <ComboBox x:Name="SplitAttributeCombo" Width="150" IsEnabled="False" />
+        </StackPanel>
+        <Button Name="ImportButton" Grid.Row="3" Content="Import" Width="100" Click="ImportButton_Click" Margin="0,5,0,0"/>
+        <TextBlock Name="StatusText" Grid.Row="4" Foreground="Red" TextWrapping="Wrap" Margin="0,15,0,0"/>
+    </Grid>
+</Window>

@@ -5,6 +5,7 @@
     <UseWPF>true</UseWPF>
     <Nullable>disable</Nullable>
     <LangVersion>9.0</LangVersion>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="AutoCAD.NET" Version="24.0.0" />
@@ -12,7 +13,8 @@
     <PackageReference Include="AutoCAD.NET.Model" Version="24.0.0" />
     <PackageReference Include="DotSpatial.Projections" Version="4.0.656" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-    <PackageReference Include="Npgsql" Version="6.0.7" />
+    <PackageReference Include="Npgsql" Version="6.0.10" />
+    <PackageReference Include="Npgsql.NetTopologySuite" Version="6.0.10" />
     <PackageReference Include="ProjNet" Version="2.0.0" />
   </ItemGroup>
   <ItemGroup>
@@ -24,6 +26,8 @@
     <EmbeddedResource Include="Resources\StandardBlocks2.dxf" />
     <EmbeddedResource Include="Resources\settings.png" />
     <EmbeddedResource Include="Resources\import.png" />
+    <EmbeddedResource Include="Resources\postgres.png" />
+    <EmbeddedResource Include="Resources\queryimport.png" />
     <Reference Include="PresentationFramework" />
   </ItemGroup>
 </Project>
