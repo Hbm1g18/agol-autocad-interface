@@ -29,6 +29,8 @@
                     Checked="SplitByAttributeCheck_Checked" Unchecked="SplitByAttributeCheck_Unchecked"/>
             <ComboBox x:Name="SplitAttributeCombo" Width="150" IsEnabled="False" />
         </StackPanel>
+        <CheckBox x:Name="LimitToExtentCheck" Content="Limit to current view extent" Margin="0,6,0,0"/>
+
 
 
 

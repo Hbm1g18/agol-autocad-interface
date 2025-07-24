@@ -112,7 +112,6 @@ namespace ArcGisAutoCAD
             _columns.Clear();
             TargetCrsBox.Text = "27700";
 
-
             if (TablesCombo.SelectedItem is not TableInfo table) return;
             _geomColumn = table.GeomColumn;
             _geomType = table.GeomType;
@@ -161,7 +160,6 @@ namespace ArcGisAutoCAD
                 .ToList();
             SplitAttributeCombo.SelectedItem = null;
             SplitAttributeCombo.IsEnabled = SplitByAttributeCheck.IsChecked == true;
-
         }
 
         private void AddCondition_Click(object sender, RoutedEventArgs e)
@@ -183,7 +181,6 @@ namespace ArcGisAutoCAD
             QueryPreview.IsReadOnly = true;
             UpdateQueryPreview(); // Restore builder-generated SQL
         }
-
 
         private void QueryCondition_Changed(object sender, EventArgs e)
         {
@@ -241,7 +238,6 @@ namespace ArcGisAutoCAD
             SplitAttributeCombo.IsEnabled = SplitByAttributeCheck.IsChecked == true;
         }
 
-
         private void ImportButton_Click(object sender, RoutedEventArgs e)
         {
             if (TablesCombo.SelectedItem is not TableInfo table) return;
@@ -251,6 +247,60 @@ namespace ArcGisAutoCAD
             int sourceEpsg = _srid;
 
             string sql = QueryPreview.Text.Trim();
+
+            if (LimitToExtentCheck.IsChecked == true)
+            {
+                var ed = AcApp.DocumentManager.MdiActiveDocument.Editor;
+                var view = ed.GetCurrentView();
+                double xmin = view.CenterPoint.X - view.Width / 2;
+                double ymin = view.CenterPoint.Y - view.Height / 2;
+                double xmax = view.CenterPoint.X + view.Width / 2;
+                double ymax = view.CenterPoint.Y + view.Height / 2;
+
+                // --- Reproject view bbox from targetEpsg (drawing) to sourceEpsg (table) ---
+                var factory = new ProjNet.CoordinateSystems.CoordinateSystemFactory();
+                var transformFactory = new ProjNet.CoordinateSystems.Transformations.CoordinateTransformationFactory();
+                var sourceCrs = factory.CreateFromWkt(FoldersWindow.GetWktForEpsg(sourceEpsg));
+                var targetCrs = factory.CreateFromWkt(FoldersWindow.GetWktForEpsg(targetEpsg));
+                var toSource = transformFactory.CreateFromCoordinateSystems(targetCrs, sourceCrs);
+
+                double[] minXY = toSource.MathTransform.Transform(new[] { xmin, ymin });
+                double[] maxXY = toSource.MathTransform.Transform(new[] { xmax, ymax });
+
+                double sxmin = Math.Min(minXY[0], maxXY[0]);
+                double symin = Math.Min(minXY[1], maxXY[1]);
+                double sxmax = Math.Max(minXY[0], maxXY[0]);
+                double symax = Math.Max(minXY[1], maxXY[1]);
+
+                string bbox = $"ST_MakeEnvelope({sxmin}, {symin}, {sxmax}, {symax}, {sourceEpsg})";
+                string intersection = $"ST_Intersection(\"{_geomColumn}\", {bbox}) AS \"{_geomColumn}\"";
+
+                // Replace geometry column in SELECT with intersection
+                int selectIdx = sql.IndexOf("SELECT", StringComparison.OrdinalIgnoreCase);
+                int fromIdx = sql.IndexOf("FROM", StringComparison.OrdinalIgnoreCase);
+                if (selectIdx != -1 && fromIdx != -1)
+                {
+                    string selectPart = sql.Substring(selectIdx, fromIdx - selectIdx);
+                    string restPart = sql.Substring(fromIdx);
+
+                    // Replace only the *first occurrence* of the geometry column in SELECT
+                    int geomIdx = selectPart.IndexOf($"\"{_geomColumn}\"", StringComparison.OrdinalIgnoreCase);
+                    if (geomIdx != -1)
+                    {
+                        selectPart = selectPart.Remove(geomIdx, _geomColumn.Length + 2)
+                                            .Insert(geomIdx, intersection);
+                    }
+                    sql = selectPart + restPart;
+                }
+
+                // Add bbox filter to WHERE/AND
+                string extentClause = $"\"{_geomColumn}\" && {bbox}";
+                if (sql.ToUpper().Contains("WHERE"))
+                    sql += $" AND {extentClause}";
+                else
+                    sql += $" WHERE {extentClause}";
+            }
+
             if (!sql.ToLower().StartsWith("select"))
             {
                 StatusText.Text = "Only SELECT statements are allowed.";
@@ -319,6 +369,26 @@ namespace ArcGisAutoCAD
                                 // skip
                                 break;
                         }
+
+                        // === Record metadata for this split layer ===
+                        var meta = new PgLayerMeta
+                        {
+                            AcadLayer = layerName,
+                            Host = settings.Host,
+                            Database = settings.Database,
+                            Username = settings.Username,
+                            Schema = table.Schema,
+                            Table = table.Table,
+                            GeomColumn = table.GeomColumn,
+                            GeomType = table.GeomType,
+                            Srid = table.Srid,
+                            ImportSql = sql,
+                            LastImported = DateTime.Now
+                        };
+                        var dwgName = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument?.Name;
+                        System.Diagnostics.Debug.WriteLine("Current DWG for meta: " + dwgName);
+                        meta.DwgFile = dwgName;
+                        PgLayerMetadata.AddOrUpdate(meta);
                     }
 
                     StatusText.Text = $"Imported {total} features from {table.DisplayName} (split by '{splitCol}').";
@@ -340,6 +410,26 @@ namespace ArcGisAutoCAD
                             StatusText.Text = $"Unsupported geometry type: {_geomType}";
                             return;
                     }
+
+                    // === Record metadata for this non-split layer ===
+                    var meta = new PgLayerMeta
+                    {
+                        AcadLayer = table.Table,
+                        Host = settings.Host,
+                        Database = settings.Database,
+                        Username = settings.Username,
+                        Schema = table.Schema,
+                        Table = table.Table,
+                        GeomColumn = table.GeomColumn,
+                        GeomType = table.GeomType,
+                        Srid = table.Srid,
+                        ImportSql = sql,
+                        LastImported = DateTime.Now
+                    };
+                    var dwgName = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument?.Name;
+                    System.Diagnostics.Debug.WriteLine("Current DWG for meta: " + dwgName);
+                    meta.DwgFile = dwgName;
+                    PgLayerMetadata.AddOrUpdate(meta);
 
                     StatusText.Text = $"Imported {features.Count} features from {table.DisplayName}.";
                 }
@@ -585,6 +675,5 @@ namespace ArcGisAutoCAD
                 return $"\"{col.Name}\" {op} {valStr}";
             }
         }
-
     }
 }

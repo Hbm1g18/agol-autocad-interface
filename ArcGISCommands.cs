@@ -1,4 +1,4 @@
-﻿using Autodesk.AutoCAD.Runtime;
+﻿﻿using Autodesk.AutoCAD.Runtime;
 using Autodesk.AutoCAD.ApplicationServices;
 using Autodesk.AutoCAD.EditorInput;
 using Autodesk.Windows;
@@ -25,6 +25,7 @@ namespace ArcGisAutoCAD
     {
         public void Initialize()
         {
+            PgLayerMetadata.CleanupForOpenDrawings();
             if (ComponentManager.Ribbon == null)
             {
                 ComponentManager.ItemInitialized += OnRibbonReady;
@@ -58,7 +59,7 @@ namespace ArcGisAutoCAD
 
             var customTab = new RibbonTab
             {
-                Title = "ArcGIS Tools",
+                Title = "CADGIS Tools",
                 Id = "ArcGISTab"
             };
             ribbon.Tabs.Add(customTab);
@@ -92,7 +93,6 @@ namespace ArcGisAutoCAD
             };
 
             panelSource.Items.Add(settingsBtn);
-            // panelSource.Items.Add(new RibbonSeparator());
             panelSource.Items.Add(foldersBtn);
 
             var postgisPanelSource = new RibbonPanelSource
@@ -132,18 +132,27 @@ namespace ArcGisAutoCAD
                 ShowImage = true,
                 CommandHandler = new RibbonCommandHandler("PGQUERYIMPORT")
             };
+            var pgRefreshBtn = new RibbonButton
+            {
+                Text = "Refresh Layer(s)",
+                ShowText = true,
+                Size = RibbonItemSize.Large,
+                Orientation = System.Windows.Controls.Orientation.Vertical,
+                LargeImage = LoadImageResource("refreshpg.png"),
+                ShowImage = true,
+                CommandHandler = new RibbonCommandHandler("PGREFRESH")
+            };
 
             postgisPanelSource.Items.Add(pgSettingsBtn);
-            // postgisPanelSource.Items.Add(new RibbonSeparator());
             postgisPanelSource.Items.Add(pgImportBtn);
             postgisPanelSource.Items.Add(pgQueryImportBtn);
+            postgisPanelSource.Items.Add(pgRefreshBtn);
         }
 
         private BitmapImage LoadImageResource(string imageName)
         {
             try
             {
-                // Get the executing assembly
                 var assembly = Assembly.GetExecutingAssembly();
                 var resourceName = assembly.GetManifestResourceNames()
                     .FirstOrDefault(name => name.EndsWith(imageName));
@@ -161,13 +170,13 @@ namespace ArcGisAutoCAD
                         return bitmap;
                     }
                 }
-                
+
                 var imagePath = Path.Combine(Path.GetDirectoryName(assembly.Location), "Resources", imageName);
                 if (File.Exists(imagePath))
                 {
                     return new BitmapImage(new Uri(imagePath));
                 }
-                
+
                 return null;
             }
             catch
@@ -176,8 +185,6 @@ namespace ArcGisAutoCAD
             }
         }
     }
-
-    
 
     public class RibbonCommandHandler : ICommand
     {
@@ -255,7 +262,6 @@ namespace ArcGisAutoCAD
         {
             var window = new PgLoginWindow();
             bool? result = window.ShowDialog();
-            // Optionally: Give feedback to the user via the AutoCAD editor
             var ed = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument.Editor;
             if (result == true)
             {
@@ -274,12 +280,36 @@ namespace ArcGisAutoCAD
             window.ShowDialog();
         }
 
-
         [CommandMethod("PGQUERYIMPORT")]
         public void PgQueryImportCommand()
         {
             var window = new PgQueryImportWindow();
             window.ShowDialog();
+        }
+
+        [CommandMethod("PGREFRESH")]
+        public void PgRefreshCommand()
+        {
+            var metas = PgLayerMetadata.Load();
+            var ed = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument.Editor;
+
+            if (metas.Count == 0)
+            {
+                ed.WriteMessage("\nNo PostGIS layers found for refresh.");
+                return;
+            }
+
+            var dialog = new PgLayerRefreshDialog(metas);
+            if (dialog.ShowDialog() != true || dialog.SelectedLayers.Count == 0)
+                return;
+
+            foreach (var meta in dialog.SelectedLayers)
+            {
+                AcadUtils.ClearLayerContents(meta.AcadLayer);
+                PgImporter.Import(meta);
+            }
+
+            ed.WriteMessage($"\nRefreshed {dialog.SelectedLayers.Count} layer(s) from PostGIS.");
         }
     }
 
@@ -287,7 +317,6 @@ namespace ArcGisAutoCAD
     {
         public string Username { get; set; }
         public string Password { get; set; }
-
         public int TargetEpsg { get; set; } = 27700;
 
         private static string SettingsPath =>
@@ -336,7 +365,6 @@ namespace ArcGisAutoCAD
         [JsonProperty("rings")]
         public List<List<double[]>> Rings { get; set; }
     }
-
 
     public class ArcGisServiceFinder
     {
@@ -441,7 +469,6 @@ namespace ArcGisAutoCAD
             var queryResponse = await _httpClient.GetStringAsync(queryUrl);
             return JsonConvert.DeserializeObject<FeatureResponse>(queryResponse);
         }
-
     }
 
     public class TokenResponse
@@ -476,7 +503,6 @@ namespace ArcGisAutoCAD
         [JsonProperty("type")]
         public string Type { get; set; }
     }
-
 
     public class Folder
     {
@@ -515,5 +541,4 @@ namespace ArcGisAutoCAD
         [JsonProperty("geometryType")]
         public string GeometryType { get; set; }
     }
-
 }

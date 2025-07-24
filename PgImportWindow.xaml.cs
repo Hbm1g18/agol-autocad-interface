@@ -133,8 +133,6 @@ namespace ArcGisAutoCAD
             }
         }
 
-
-
         private void ImportButton_Click(object sender, RoutedEventArgs e)
         {
             if (TablesCombo.SelectedItem is not PgTableInfo table)
@@ -143,8 +141,9 @@ namespace ArcGisAutoCAD
                 return;
             }
 
-            int.TryParse(SourceCrsBox.Text, out var sourceEpsg);
-            int.TryParse(TargetCrsBox.Text, out var targetEpsg);
+            int sourceEpsg, targetEpsg;
+            int.TryParse(SourceCrsBox.Text, out sourceEpsg);
+            int.TryParse(TargetCrsBox.Text, out targetEpsg);
 
             if (sourceEpsg == 0) sourceEpsg = table.Srid;
             if (targetEpsg == 0) targetEpsg = 27700;
@@ -157,7 +156,43 @@ namespace ArcGisAutoCAD
                     $"Host={settings.Host};Username={settings.Username};Password={settings.Password};Database={settings.Database};Port={settings.Port};");
                 conn.Open();
 
-                string sql = $"SELECT *, (\"{table.GeomColumn}\") AS geom FROM \"{table.Schema}\".\"{table.Table}\"";
+                string sql;
+
+                if (LimitToExtentCheck.IsChecked == true)
+                {
+                    // 1. Get view bbox in target CRS (drawing units)
+                    var ed = AcApp.DocumentManager.MdiActiveDocument.Editor;
+                    var view = ed.GetCurrentView();
+                    double xmin = view.CenterPoint.X - view.Width / 2;
+                    double ymin = view.CenterPoint.Y - view.Height / 2;
+                    double xmax = view.CenterPoint.X + view.Width / 2;
+                    double ymax = view.CenterPoint.Y + view.Height / 2;
+
+                    // 2. Reproject bbox to table SRID
+                    var factory = new ProjNet.CoordinateSystems.CoordinateSystemFactory();
+                    var transformFactory = new ProjNet.CoordinateSystems.Transformations.CoordinateTransformationFactory();
+                    var sourceCrs = factory.CreateFromWkt(FoldersWindow.GetWktForEpsg(sourceEpsg));
+                    var targetCrs = factory.CreateFromWkt(FoldersWindow.GetWktForEpsg(targetEpsg));
+                    var toSource = transformFactory.CreateFromCoordinateSystems(targetCrs, sourceCrs);
+
+                    double[] minXY = toSource.MathTransform.Transform(new[] { xmin, ymin });
+                    double[] maxXY = toSource.MathTransform.Transform(new[] { xmax, ymax });
+
+                    double sxmin = Math.Min(minXY[0], maxXY[0]);
+                    double symin = Math.Min(minXY[1], maxXY[1]);
+                    double sxmax = Math.Max(minXY[0], maxXY[0]);
+                    double symax = Math.Max(minXY[1], maxXY[1]);
+
+                    string bbox = $"ST_MakeEnvelope({sxmin}, {symin}, {sxmax}, {symax}, {sourceEpsg})";
+                    string select = $"SELECT *, ST_Intersection(\"{table.GeomColumn}\", {bbox}) AS geom FROM \"{table.Schema}\".\"{table.Table}\"";
+                    string whereClause = $"\"{table.GeomColumn}\" && {bbox}";
+                    sql = $"{select} WHERE {whereClause}";
+                }
+                else
+                {
+                    sql = $"SELECT *, (\"{table.GeomColumn}\") AS geom FROM \"{table.Schema}\".\"{table.Table}\"";
+                }
+
                 var features = new List<Dictionary<string, object>>();
 
                 using var cmd = new NpgsqlCommand(sql, conn);
@@ -207,6 +242,24 @@ namespace ArcGisAutoCAD
                                 // just skip unknown types
                                 break;
                         }
+
+                        // === Record metadata for this split layer ===
+                        var meta = new PgLayerMeta
+                        {
+                            AcadLayer = layerName,
+                            Host = settings.Host,
+                            Database = settings.Database,
+                            Username = settings.Username,
+                            Schema = table.Schema,
+                            Table = table.Table,
+                            GeomColumn = table.GeomColumn,
+                            GeomType = table.GeomType,
+                            Srid = table.Srid,
+                            ImportSql = null,
+                            LastImported = DateTime.Now
+                        };
+                        meta.DwgFile = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument?.Name;
+                        PgLayerMetadata.AddOrUpdate(meta);
                     }
 
                     StatusText.Text = $"Imported {total} features from {table.DisplayName} (split by '{splitCol}').";
@@ -232,6 +285,24 @@ namespace ArcGisAutoCAD
                             return;
                     }
 
+                    // === Record metadata for this non-split layer ===
+                    var meta = new PgLayerMeta
+                    {
+                        AcadLayer = table.Table,
+                        Host = settings.Host,
+                        Database = settings.Database,
+                        Username = settings.Username,
+                        Schema = table.Schema,
+                        Table = table.Table,
+                        GeomColumn = table.GeomColumn,
+                        GeomType = table.GeomType,
+                        Srid = table.Srid,
+                        ImportSql = null,
+                        LastImported = DateTime.Now
+                    };
+                    meta.DwgFile = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument?.Name;
+                    PgLayerMetadata.AddOrUpdate(meta);
+
                     StatusText.Text = $"Imported {features.Count} features from {table.DisplayName}.";
                 }
 
@@ -242,6 +313,7 @@ namespace ArcGisAutoCAD
                 StatusText.Text = $"Import failed: {ex.Message}";
             }
         }
+
 
         // Overload ImportPoints so you can pass a custom layer name:
         private void ImportPoints(List<Dictionary<string, object>> features, PgTableInfo table, int sourceEpsg, int targetEpsg, string customLayerName = null)
@@ -273,7 +345,6 @@ namespace ArcGisAutoCAD
 
             DrawFeatures(features, table.GeomColumn, "point", sourceEpsg, targetEpsg, customLayerName ?? table.Table, chosenBlock, attrField);
         }
-
 
         private void DrawFeatures(List<Dictionary<string, object>> features, string geomColumn, string type,
                           int sourceEpsg, int targetEpsg, string acadLayer, string blockName = null, string attrField = null)
@@ -356,13 +427,11 @@ namespace ArcGisAutoCAD
                     }
                 }
 
-
                 tr.Commit();
             }
 
             ed.WriteMessage($"\nLoaded {features.Count} {type} features into '{acadLayer}'.");
         }
-
 
         private void InsertPoint(NetTopologySuite.Geometries.Point pt, ICoordinateTransformation transform, BlockTableRecord btr, ObjectId layerId,
                                  Transaction tr, Dictionary<string, object> feature, BlockTable bt, string blockName, string attrField)
@@ -406,7 +475,7 @@ namespace ArcGisAutoCAD
             var pline = new Polyline();
             for (int i = 0; i < ls.NumPoints; i++)
             {
-                var coord = ls.GetCoordinateN(i); // Fix for CS1061
+                var coord = ls.GetCoordinateN(i);
                 var coords = transform.MathTransform.Transform(new[] { coord.X, coord.Y });
                 pline.AddVertexAt(i, new Point2d(coords[0], coords[1]), 0, 0, 0);
             }

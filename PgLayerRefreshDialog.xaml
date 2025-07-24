@@ -1,0 +1,13 @@
+<Window x:Class="ArcGisAutoCAD.PgLayerRefreshDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Refresh PostGIS Layers" Height="350" Width="400" ResizeMode="CanMinimize" WindowStartupLocation="CenterOwner">
+    <StackPanel Margin="10">
+        <TextBlock Text="Select PostGIS layers to refresh:" FontWeight="Bold" Margin="0,0,0,6"/>
+        <ListBox x:Name="LayersListBox" DisplayMemberPath="AcadLayer" Height="200" Margin="0,0,0,8"/>
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button Content="OK" Width="75" Margin="0,0,10,0" IsDefault="True" Click="Ok_Click"/>
+            <Button Content="Cancel" Width="75" IsCancel="True" Click="Cancel_Click"/>
+        </StackPanel>
+    </StackPanel>
+</Window>
