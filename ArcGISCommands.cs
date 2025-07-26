@@ -2,6 +2,7 @@
 using Autodesk.AutoCAD.ApplicationServices;
 using Autodesk.AutoCAD.EditorInput;
 using Autodesk.Windows;
+using Autodesk.AutoCAD.Geometry;
 using System;
 using System.IO;
 using System.Net.Http;
@@ -142,11 +143,39 @@ namespace ArcGisAutoCAD
                 ShowImage = true,
                 CommandHandler = new RibbonCommandHandler("PGREFRESH")
             };
+            var appendixPanelSource = new RibbonPanelSource
+            {
+                Title = "Appendix"
+            };
+            var appendixPanel = new RibbonPanel { Source = appendixPanelSource };
+            customTab.Panels.Add(appendixPanel);
+            var appendixBtn = new RibbonButton
+            {
+                Text = "Make Appendix",
+                ShowText = true,
+                Size = RibbonItemSize.Large,
+                Orientation = System.Windows.Controls.Orientation.Vertical,
+                LargeImage = LoadImageResource("photoappendix.png"),
+                ShowImage = true,
+                CommandHandler = new RibbonCommandHandler("MAKEAPPENDIX")
+            };
+            var appendixSettingsBtn = new RibbonButton
+            {
+                Text = "Appendix Settings",
+                ShowText = true,
+                Size = RibbonItemSize.Large,
+                Orientation = System.Windows.Controls.Orientation.Vertical,
+                LargeImage = LoadImageResource("settings.png"),
+                ShowImage = true,
+                CommandHandler = new RibbonCommandHandler("APPENDIXSETTINGS")
+            };
 
             postgisPanelSource.Items.Add(pgSettingsBtn);
             postgisPanelSource.Items.Add(pgImportBtn);
             postgisPanelSource.Items.Add(pgQueryImportBtn);
             postgisPanelSource.Items.Add(pgRefreshBtn);
+            appendixPanelSource.Items.Add(appendixBtn);
+            appendixPanelSource.Items.Add(appendixSettingsBtn);
         }
 
         private BitmapImage LoadImageResource(string imageName)
@@ -311,6 +340,228 @@ namespace ArcGisAutoCAD
 
             ed.WriteMessage($"\nRefreshed {dialog.SelectedLayers.Count} layer(s) from PostGIS.");
         }
+        [CommandMethod("MAKEAPPENDIX")]
+        public void MakeAppendixCommand()
+        {
+            var window = new PgAppendixMakerWindow();
+            window.ShowDialog();
+        }
+        [CommandMethod("APPENDIXSETTINGS")]
+        public void AppendixSettingsCommand()
+        {
+            var window = new AppendixTemplateManagerWindow();
+            window.ShowDialog();
+        }
+
+        [CommandMethod("ATTACHTEST")]
+        public void AttachPhoto()
+        {
+            Document doc = Application.DocumentManager.MdiActiveDocument;
+            Database db = doc.Database;
+            Editor ed = doc.Editor;
+
+            string imagePath = @"P:\Digital Photographs\DP268 (July 2025)\Desford Quarry\Photo2.jpg";
+            string imageName = Path.GetFileNameWithoutExtension(imagePath);
+            double rectWidth = 150;
+            double rectHeight = 110;
+
+            using (Transaction tr = db.TransactionManager.StartTransaction())
+            {
+                try
+                {
+                    BlockTable bt = tr.GetObject(db.BlockTableId, OpenMode.ForRead) as BlockTable;
+                    BlockTableRecord ms = tr.GetObject(bt[BlockTableRecord.ModelSpace], OpenMode.ForWrite) as BlockTableRecord;
+
+                    // Create or get layer with image name
+                    LayerTable lt = tr.GetObject(db.LayerTableId, OpenMode.ForRead) as LayerTable;
+                    if (!lt.Has(imageName))
+                    {
+                        lt.UpgradeOpen();
+                        LayerTableRecord ltr = new LayerTableRecord
+                        {
+                            Name = imageName
+                        };
+                        lt.Add(ltr);
+                        tr.AddNewlyCreatedDBObject(ltr, true);
+                    }
+
+                    ObjectId layerId = lt[imageName];
+
+                    // Draw rectangle
+                    Point2d pt1 = new Point2d(0, 0);
+                    Point2d pt2 = new Point2d(rectWidth, rectHeight);
+                    Polyline rect = new Polyline(4);
+                    rect.AddVertexAt(0, pt1, 0, 0, 0);
+                    rect.AddVertexAt(1, new Point2d(pt2.X, pt1.Y), 0, 0, 0);
+                    rect.AddVertexAt(2, pt2, 0, 0, 0);
+                    rect.AddVertexAt(3, new Point2d(pt1.X, pt2.Y), 0, 0, 0);
+                    rect.Closed = true;
+                    rect.LayerId = layerId;
+                    ms.AppendEntity(rect);
+                    tr.AddNewlyCreatedDBObject(rect, true);
+
+                    // Create image definition
+                    RasterImageDef imageDef = new RasterImageDef
+                    {
+                        SourceFileName = imagePath
+                    };
+                    imageDef.Load();
+
+                    ObjectId imageDictId = RasterImageDef.GetImageDictionary(db);
+                    if (imageDictId.IsNull)
+                        imageDictId = RasterImageDef.CreateImageDictionary(db);
+
+                    DBDictionary imageDict = tr.GetObject(imageDictId, OpenMode.ForWrite) as DBDictionary;
+                    string imageKey = "IMG_" + imageName;
+                    imageDict.SetAt(imageKey, imageDef);
+                    tr.AddNewlyCreatedDBObject(imageDef, true);
+
+                    // Create image entity
+                    RasterImage image = new RasterImage
+                    {
+                        ImageDefId = imageDef.ObjectId,
+                        ShowImage = true,
+                        LayerId = layerId
+                    };
+
+                    // Set image orientation and scale
+                    Point3d insPt = new Point3d(0, 0, 0);
+                    Vector3d u = new Vector3d(rectWidth, 0, 0);
+                    Vector3d v = new Vector3d(0, rectHeight, 0); // flip Y for image
+                    image.Orientation = new CoordinateSystem3d(insPt, u, v);
+
+                    ms.AppendEntity(image);
+                    tr.AddNewlyCreatedDBObject(image, true);
+                    RasterImage.EnableReactors(true);
+                    image.AssociateRasterDef(imageDef);
+
+                    // Create a viewport in the layout and zoom to rectangle
+                    LayoutManager lm = LayoutManager.Current;
+                    string layoutName = lm.CurrentLayout;
+                    ObjectId layoutId = lm.GetLayoutId(layoutName);
+                    Layout layout = tr.GetObject(layoutId, OpenMode.ForRead) as Layout;
+
+                    if (!layout.ModelType) // Only proceed if it's a paper space layout
+                    {
+                        BlockTableRecord ps = tr.GetObject(layout.BlockTableRecordId, OpenMode.ForWrite) as BlockTableRecord;
+
+                        // Paper space dimensions for the viewport (match rectangle aspect ratio)
+                        double viewportHeight = 100; // you can adjust this scale
+                        double aspect = rectWidth / rectHeight;
+                        double viewportWidth = viewportHeight * aspect;
+
+                        // Paper space center point (you can shift this around)
+                        Point3d paperCenter = new Point3d(200, 150, 0);
+
+                        // Model space center of the rectangle
+                        Point2d modelCenter = new Point2d(rectWidth / 2.0, rectHeight / 2.0);
+
+                        Viewport vp = new Viewport
+                        {
+                            CenterPoint = paperCenter,              // paper space position
+                            Width = viewportWidth,                  // paper space size
+                            Height = viewportHeight,
+                            ViewCenter = modelCenter,               // model space point to look at
+                            ViewHeight = rectHeight,                // model view height
+                            Layer = "Defpoints",
+                            On = true
+                        };
+
+                        vp.SetDatabaseDefaults();
+                        ps.AppendEntity(vp);
+                        tr.AddNewlyCreatedDBObject(vp, true);
+                    }
+
+                    tr.Commit();
+                    ed.WriteMessage($"\nImage '{imageName}' attached and aligned to {rectWidth}x{rectHeight} rectangle.");
+                }
+                catch (System.Exception ex)
+                {
+                    ed.WriteMessage("\nError: " + ex.Message);
+                    tr.Abort();
+                }
+            }
+        }
+
+        [CommandMethod("CopyFullLayout")]
+        public void CopyFullLayout()
+        {
+            Document doc = Application.DocumentManager.MdiActiveDocument;
+            Database db = doc.Database;
+            Editor ed = doc.Editor;
+
+            string templatePath = @"P:/Tools/AUTOCAD/appendix.dwt";
+            string sourceLayoutName = "Layout1";
+            string newLayoutName = "NewAppendixLayout";
+
+            try
+            {
+                // Open the template database
+                using (Database templateDb = new Database(false, true))
+                {
+                    templateDb.ReadDwgFile(templatePath, FileOpenMode.OpenForReadAndAllShare, true, null);
+
+                    // Start transaction in target database
+                    using (Transaction tr = db.TransactionManager.StartTransaction())
+                    {
+                        // Get layout manager and check if layout exists
+                        LayoutManager lm = LayoutManager.Current;
+                        if (lm.LayoutExists(newLayoutName))
+                        {
+                            ed.WriteMessage($"\nLayout '{newLayoutName}' already exists.");
+                            return;
+                        }
+
+                        // Import the layout using WblockCloneObjects
+                        using (Transaction templateTr = templateDb.TransactionManager.StartTransaction())
+                        {
+                            // Get source layout and its BlockTableRecord
+                            DBDictionary templateLayouts = templateTr.GetObject(
+                                templateDb.LayoutDictionaryId, OpenMode.ForRead) as DBDictionary;
+                            
+                            if (!templateLayouts.Contains(sourceLayoutName))
+                            {
+                                ed.WriteMessage($"\nLayout '{sourceLayoutName}' not found in template.");
+                                return;
+                            }
+
+                            ObjectId sourceLayoutId = templateLayouts.GetAt(sourceLayoutName);
+                            Layout sourceLayout = templateTr.GetObject(sourceLayoutId, OpenMode.ForRead) as Layout;
+                            BlockTableRecord sourceBtr = templateTr.GetObject(
+                                sourceLayout.BlockTableRecordId, OpenMode.ForRead) as BlockTableRecord;
+
+                            // Create new layout in target database
+                            ObjectId newLayoutId = lm.CreateLayout(newLayoutName);
+                            Layout newLayout = tr.GetObject(newLayoutId, OpenMode.ForWrite) as Layout;
+                            BlockTableRecord destBtr = tr.GetObject(
+                                newLayout.BlockTableRecordId, OpenMode.ForWrite) as BlockTableRecord;
+
+                            // Clone all objects using WblockCloneObjects
+                            IdMapping idMap = new IdMapping();
+                            templateDb.WblockCloneObjects(
+                                new ObjectIdCollection(sourceBtr.Cast<ObjectId>().ToArray()),
+                                destBtr.ObjectId,
+                                idMap,
+                                DuplicateRecordCloning.Replace,
+                                false);
+
+                            // Copy layout properties
+                            newLayout.CopyFrom(sourceLayout);
+
+                            templateTr.Commit();
+                        }
+                        tr.Commit();
+                    }
+                }
+                ed.WriteMessage($"\nSuccessfully created layout '{newLayoutName}' with all content.");
+            }
+            catch (System.Exception ex)
+            {
+                ed.WriteMessage($"\nError: {ex.Message}\n{ex.StackTrace}");
+            }
+        }
+
+
     }
 
     public class ArcSettings

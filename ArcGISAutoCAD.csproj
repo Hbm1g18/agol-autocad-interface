@@ -29,6 +29,7 @@
     <EmbeddedResource Include="Resources\postgres.png" />
     <EmbeddedResource Include="Resources\queryimport.png" />
     <EmbeddedResource Include="Resources\refreshpg.png" />
+    <EmbeddedResource Include="Resources\photoappendix.png" />
     <Reference Include="PresentationFramework" />
   </ItemGroup>
 </Project>

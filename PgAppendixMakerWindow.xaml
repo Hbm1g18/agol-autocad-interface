@@ -1,0 +1,20 @@
+<Window x:Class="ArcGisAutoCAD.PgAppendixMakerWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Make Appendix" Height="350" Width="400">
+    <StackPanel Margin="10">
+        <Label Content="Select Template:"/>
+        <ComboBox x:Name="TemplateCombo" DisplayMemberPath="Name" Margin="0,0,0,10"/>
+
+        <Label Content="Select Table:"/>
+        <ComboBox x:Name="TableCombo" DisplayMemberPath="DisplayName" SelectionChanged="TableCombo_Changed" Margin="0,0,0,10"/>
+
+        <Label Content="Image Field:"/>
+        <ComboBox x:Name="ImageFieldCombo" Margin="0,0,0,5"/>
+
+        <Label Content="Comment Field:"/>
+        <ComboBox x:Name="CommentFieldCombo" Margin="0,0,0,10"/>
+
+        <Button Content="Generate Appendices" Click="Generate_Click" Width="160" HorizontalAlignment="Left"/>
+    </StackPanel>
+</Window>
